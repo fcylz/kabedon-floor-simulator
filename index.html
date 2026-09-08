@@ -175,7 +175,7 @@
     </div>
 
     <div id="ui-content">
-        <p class="app-description">性別と身長から押し倒し・押し倒されの雰囲気をシミュレーションします。</p>
+        <p class="app-description">性別と身長から床ドンをシミュレーションします。</p>
         
         <div class="input-group group-a">
             <div class="section-header"><strong>A (下)</strong></div>
@@ -190,7 +190,7 @@
         </div>
 
         <div class="input-group group-b">
-            <div class="section-header"><strong>B (上)</strong></div>
+            <div class="section-header"><strong>B (上・四つん這い)</strong></div>
             <div class="input-row">
                 <div class="input-item"><span class="hint">名前</span><input type="text" id="nameB" placeholder="名前B" oninput="updateScene()"></div>
                 <div class="input-item" style="flex: 0.6;"><span class="hint">性別</span><select id="genderB" onchange="updateScene()"><option value="male" selected>男</option><option value="female">女</option></select></div>
@@ -336,12 +336,35 @@
 
         group.legs = [];
         [-1, 1].forEach(side => {
-            const anchor = new THREE.Group(); anchor.position.set(side * (torsoW * 0.25), legH, 0);
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(torsoW*0.4, legH, torsoW*0.4), bodyMat);
-            mesh.position.y = -legH * 0.5; anchor.add(mesh); group.add(anchor); group.legs.push(anchor);
-            
-            if(role === 'A') {
-                anchor.rotation.z = side * (10 * Math.PI / 180);
+            const hip = new THREE.Group();
+            hip.position.set(side * (torsoW * 0.25), legH, 0);
+
+            if (role === 'B') {
+                const thighLen = legH * 0.5;
+                const thigh = new THREE.Mesh(new THREE.BoxGeometry(torsoW*0.4, thighLen, torsoW*0.4), bodyMat);
+                thigh.position.y = -thighLen * 0.5;
+                hip.add(thigh);
+
+                const knee = new THREE.Group();
+                knee.position.set(0, -thighLen, 0);
+                const calfLen = legH * 0.5;
+                const calf = new THREE.Mesh(new THREE.BoxGeometry(torsoW*0.4, calfLen, torsoW*0.4), bodyMat);
+                calf.position.y = -calfLen * 0.5;
+                knee.add(calf);
+                hip.add(knee);
+
+                group.add(hip);
+                group.legs.push({ hip: hip, knee: knee });
+            } else {
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(torsoW*0.4, legH, torsoW*0.4), bodyMat);
+                mesh.position.y = -legH * 0.5; 
+                hip.add(mesh); 
+                group.add(hip); 
+                group.legs.push(hip);
+                
+                if(role === 'A') {
+                    hip.rotation.z = side * (10 * Math.PI / 180);
+                }
             }
         });
 
@@ -401,14 +424,11 @@
         });
 
         const legH = personB.userData.legH;
-        const legAnchorY = legH; 
-        const legBaseWorldY = personB.position.y + Math.cos(bRotX) * legAnchorY;
-        const targetCos = legBaseWorldY / legH;
-        const finalLegRotX = -Math.acos(Math.min(1, Math.max(-1, targetCos))) - bRotX;
 
         personB.legs.forEach((leg, i) => {
-            leg.rotation.x = finalLegRotX;
-            leg.rotation.z = (i === 0 ? -1 : 1) * 0.5;
+            leg.hip.rotation.x = -0.8 - bRotX;
+            leg.knee.rotation.x = 1.6;
+            leg.hip.rotation.z = (i === 0 ? -1 : 1) * 0.3;
         });
 
         walkGroup.add(personA, personB);
@@ -433,13 +453,16 @@
     function animate() {
         requestAnimationFrame(animate);
         
-        const centerPos = new THREE.Vector3(0, personA.userData.depth * 0.5, personA.userData.height * -0.4);
+        // ふたりの胴体の中心を計算（世界座標ベース）
+        const torsoAWorldPos = new THREE.Vector3(0, personA.userData.legH + personA.userData.torsoH * 0.5, 0).applyMatrix4(personA.matrixWorld);
+        const torsoBWorldPos = new THREE.Vector3(0, personB.userData.legH + personB.userData.torsoH * 0.5, 0).applyMatrix4(personB.matrixWorld);
+        const centerPos = new THREE.Vector3().addVectors(torsoAWorldPos, torsoBWorldPos).multiplyScalar(0.5);
 
         if (currentView === '3rd') {
             camera.up.set(0, 1, 0);
             camera.position.set(
                 centerPos.x + Math.sin(rotation.y) * camDist, 
-                centerPos.y + 1 + Math.sin(rotation.x) * camDist, 
+                centerPos.y + Math.sin(rotation.x) * camDist, 
                 centerPos.z + Math.cos(rotation.y) * camDist
             );
             camera.lookAt(centerPos);
