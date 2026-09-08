@@ -459,11 +459,12 @@
         const centerPos = new THREE.Vector3().addVectors(torsoAWorldPos, torsoBWorldPos).multiplyScalar(0.5);
 
         if (currentView === '3rd') {
+            rotation.x = Math.max(-Math.PI * 0.499, Math.min(Math.PI * 0.499, rotation.x));
             camera.up.set(0, 1, 0);
             camera.position.set(
-                centerPos.x + Math.sin(rotation.y) * camDist, 
+                centerPos.x + Math.sin(rotation.y) * Math.cos(rotation.x) * camDist, 
                 centerPos.y + Math.sin(rotation.x) * camDist, 
-                centerPos.z + Math.cos(rotation.y) * camDist
+                centerPos.z + Math.cos(rotation.y) * Math.cos(rotation.x) * camDist
             );
             camera.lookAt(centerPos);
         } else {
